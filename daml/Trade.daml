@@ -44,25 +44,25 @@ template Trade
     controller facilitator can
       MakePayment : ContractId Trade
         do
-          ensure approved
+          assert approved
           create this with paymentMade = True
       FacilitatorApproveTrade : ContractId Trade
         do
-          not (ensure approved)
+          -- not (assert approved)
           create this with approved = True
 
     controller seller can
       ConfirmPayment : ContractId Trade
         do
-          ensure approved
+          assert approved
           create this with paymentMade = True
 
     controller authority can
       ApproveTrade : ContractId Trade
         do
-          not (ensure approved)
+          -- not (assert approved)
           create this with approved = True
-      RejectTrade : ContractId Trade
+      RejectTrade : ()
         do archive this
 
 template TradeProposal
