@@ -28,15 +28,14 @@ template Trade
     buyer : Party
     seller : Party
     currency : Text
-    matchTime: Date
     approved: Bool
     paymentMade: Bool
     uuid : Text
-    amount : Decimal
+    amount : Int
     volume : Int
     observers : [Party]
   where
-    ensure (tradeData.amount > 0.0 && tradeData.volume > 0)
+    ensure (amount > 0 && volume > 0)
 
     signatory buyer
 
@@ -45,31 +44,26 @@ template Trade
     controller facilitator can
       MakePayment : ContractId Trade
         do
-          ensure approved == true
-          create this with
-            paymentMade = true
+          ensure approved
+          create this with paymentMade = True
       FacilitatorApproveTrade : ContractId Trade
         do
-          ensure approved == true
-          create this with
-            paymentMade = true
+          not (ensure approved)
+          create this with approved = True
 
     controller seller can
       ConfirmPayment : ContractId Trade
         do
-          ensure approved == true
-          create this with
-            paymentMade = true
+          ensure approved
+          create this with paymentMade = True
 
     controller authority can
       ApproveTrade : ContractId Trade
         do
-          ensure approved == false
-          create this with
-            approved = true
-      RejectTrade : null
-        do
-          archive this
+          not (ensure approved)
+          create this with approved = True
+      RejectTrade : ContractId Trade
+        do archive this
 
 template TradeProposal
   with
@@ -87,10 +81,13 @@ happyPath = scenario do
   buyer <- getParty "Alice"
   seller <- getParty "Bob"
 
-  let uuid = "abc123"; currency = "AUD"; amount = 1000; volume = 50;
+  let uuid = "abc123"; currency = "AUD"; amount = 1000; volume = 50; paymentMade = False;
 
-  saleByAlice <- submit facilitator do create Trade with buyer; seller; facilitator; authority; uuid; currency; amount; volume
-  
+  saleByAlice <- submit facilitator do
+    create Trade
+      with
+        facilitator; authority; buyer; seller; approved = False; paymentMade = False; uuid; currency; amount; volume; observers = [authority]
+
   authorityApproved <- submit authority do exercise saleByAlice ApproveTrade
   facilitatorPaid <- submit facilitator do exercise authorityApproved MakePayment
   sellerConfirms <- submit seller do exercise facilitatorPaid ConfirmPayment
