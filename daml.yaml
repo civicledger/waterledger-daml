@@ -1,0 +1,13 @@
+sdk-version: 0.13.54
+name: Civic
+source: daml
+scenario: Main:setup
+parties:
+  - Alice
+  - Bob
+  - WaterLedger
+  - SunWater
+version: 0.0.1
+dependencies:
+  - daml-prim
+  - daml-stdlib

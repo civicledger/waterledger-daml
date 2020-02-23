@@ -1,0 +1,98 @@
+-- Copyright (c) 2020 The DAML Authors. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+daml 1.2
+module Trade where
+
+import DA.Optional
+
+type TradeCid = ContractId Trade
+
+data TradeData = TradeData
+  with
+    uuid : Text
+    amount : Decimal
+    volume : Int
+  deriving (Eq, Show)
+
+data WorkflowData = WorkflowData
+  with
+    approved: Bool
+    paymentMade: Bool
+  deriving (Eq, Show)
+
+template Trade
+  with
+    facilitator : Party
+    authority : Party
+    buyer : Party
+    seller : Party
+    currency : Text
+    matchTime: Date
+    approved: Bool
+    paymentMade: Bool
+    uuid : Text
+    amount : Decimal
+    volume : Int
+    observers : [Party]
+  where
+    ensure (tradeData.amount > 0.0 && tradeData.volume > 0)
+
+    signatory buyer
+
+    observer observers, authority
+
+    controller facilitator can
+      MakePayment : ContractId Trade
+        do
+          ensure approved == true
+          create this with
+            paymentMade = true
+      FacilitatorApproveTrade : ContractId Trade
+        do
+          ensure approved == true
+          create this with
+            paymentMade = true
+
+    controller seller can
+      ConfirmPayment : ContractId Trade
+        do
+          ensure approved == true
+          create this with
+            paymentMade = true
+
+    controller authority can
+      ApproveTrade : ContractId Trade
+        do
+          ensure approved == false
+          create this with
+            approved = true
+      RejectTrade : null
+        do
+          archive this
+
+template TradeProposal
+  with
+    trade: Trade
+  where
+    signatory trade.seller
+    controller trade.facilitator can
+      AcceptTradeIssuance: TradeCid
+        do create trade
+
+happyPath = scenario do
+
+  authority <- getParty "SunWater"
+  facilitator <- getParty "WaterLedger"
+  buyer <- getParty "Alice"
+  seller <- getParty "Bob"
+
+  let uuid = "abc123"; currency = "AUD"; amount = 1000; volume = 50;
+
+  saleByAlice <- submit facilitator do create Trade with buyer; seller; facilitator; authority; uuid; currency; amount; volume
+  
+  authorityApproved <- submit authority do exercise saleByAlice ApproveTrade
+  facilitatorPaid <- submit facilitator do exercise authorityApproved MakePayment
+  sellerConfirms <- submit seller do exercise facilitatorPaid ConfirmPayment
+
+  return()
