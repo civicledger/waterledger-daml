@@ -1,5 +1,5 @@
 sdk-version: 0.13.54
-name: Civic
+name: WaterLedger
 source: daml
 scenario: Main:setup
 parties:

@@ -4,47 +4,59 @@
 daml 1.2
 module Trade where
 
-type TradeCid = ContractId Trade
+data TradeData = TradeData
+  with
+    buyer : Party
+    seller : Party
+    uuid : Text
+    currency : Text
+    amount : Int
+    volume : Int
+  deriving (Eq, Show)
 
-template Trade
+type TradeCid = ContractId NewTrade
+
+template NewTrade
   with
     facilitator : Party
     authority : Party
-    buyer : Party
-    seller : Party
-    currency : Text
-    paymentMade: Bool
-    uuid : Text
-    amount : Int
-    volume : Int
     observers : [Party]
+    trade: TradeData
   where
-    ensure (amount > 0 && volume > 0)
+    ensure (trade.amount > 0 && trade.volume > 0)
 
-    signatory buyer, facilitator
+    signatory trade.buyer, facilitator
 
     observer observers, authority
 
     controller facilitator can
-      MakePayment : ContractId Trade
+      MakePayment : ContractId PaidTrade
         do
-          create this with paymentMade = True
+          create PaidTrade with ..
 
-    controller seller can
-      ConfirmPayment : ContractId Trade
-        do
-          create this with paymentMade = True
+template PaidTrade
+  with
+    facilitator : Party
+    authority : Party
+    observers : [Party]
+    trade: TradeData
+  where
+    signatory trade.buyer, facilitator
+
+    controller trade.seller can
+      ConfirmPayment : ()
+        do return ()
 
 
 template TradeProposal
   with
-    trade: Trade
+    newTrade: NewTrade
   where
-    signatory trade.buyer
+    signatory newTrade.facilitator
 
-    controller trade.buyer can
+    controller newTrade.trade.buyer can
       AcceptTradeIssuance: TradeCid
-        do create trade
+        do create newTrade
 
 happyPath = scenario do
 
@@ -53,13 +65,20 @@ happyPath = scenario do
   seller <- getParty "Alice"
   buyer <- getParty "Bob"
 
-  let uuid = "abc123"; currency = "AUD"; amount = 1000; volume = 50; paymentMade = False;observers = [authority]; approved = False;
+  let
+    uuid = "abc123"
+    currency = "AUD"
+    amount = 1000
+    volume = 50
+    paymentMade = False
+    observers = [authority]
+    approved = False;
+    trade = TradeData with ..
+    newTrade = NewTrade with ..
 
-  let trade = Trade with ..
-
-  createProposal <- submit facilitator do create TradeProposal with trade
+  createProposal <- submit facilitator do create TradeProposal with newTrade
   acceptProposal <- submit buyer do exercise createProposal AcceptTradeIssuance
-  facilitatorPaid <- submit facilitator do exercise acceptedProposal MakePayment
+  facilitatorPaid <- submit facilitator do exercise acceptProposal MakePayment
   sellerConfirms <- submit seller do exercise facilitatorPaid ConfirmPayment
 
   return()
