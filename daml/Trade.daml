@@ -4,8 +4,6 @@
 daml 1.2
 module Trade where
 
-import DA.Optional
-
 type TradeCid = ContractId Trade
 
 data TradeData = TradeData
@@ -62,15 +60,15 @@ template Trade
         do
           -- not (assert approved)
           create this with approved = True
-      RejectTrade : ()
-        do archive this
+      -- RejectTrade : ()
+      --   do archive this
 
 template TradeProposal
   with
     trade: Trade
   where
-    signatory trade.seller
-    controller trade.facilitator can
+    signatory trade.facilitator
+    controller trade.buyer can
       AcceptTradeIssuance: TradeCid
         do create trade
 
@@ -78,17 +76,26 @@ happyPath = scenario do
 
   authority <- getParty "SunWater"
   facilitator <- getParty "WaterLedger"
-  buyer <- getParty "Alice"
-  seller <- getParty "Bob"
+  seller <- getParty "Alice"
+  buyer <- getParty "Bob"
 
   let uuid = "abc123"; currency = "AUD"; amount = 1000; volume = 50; paymentMade = False;
 
-  saleByAlice <- submit facilitator do
-    create Trade
+  createProposal <- submit facilitator do
+    create TradeProposal
       with
-        facilitator; authority; buyer; seller; approved = False; paymentMade = False; uuid; currency; amount; volume; observers = [authority]
+        Trade
+          with
+            facilitator; authority; buyer; seller; approved = False; paymentMade = False; uuid; currency; amount; volume; observers = [authority]
 
-  authorityApproved <- submit authority do exercise saleByAlice ApproveTrade
+
+  -- saleByAlice <- submit facilitator do
+  --   create Trade
+  --     with
+  --       facilitator; authority; buyer; seller; approved = False; paymentMade = False; uuid; currency; amount; volume; observers = [authority]
+
+  acceptedProposal <- submit buyer do exercise createProposal AcceptTradeIssuance
+  authorityApproved <- submit authority do exercise acceptedProposal ApproveTrade
   facilitatorPaid <- submit facilitator do exercise authorityApproved MakePayment
   sellerConfirms <- submit seller do exercise facilitatorPaid ConfirmPayment
 
