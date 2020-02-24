@@ -66,13 +66,8 @@ happyPath = scenario do
   buyer <- getParty "Bob"
 
   let
-    uuid = "abc123"
-    currency = "AUD"
-    amount = 1000
-    volume = 50
-    paymentMade = False
+    uuid = "abc123"; currency = "AUD"; amount = 1000; volume = 50
     observers = [authority]
-    approved = False;
     trade = TradeData with ..
     newTrade = NewTrade with ..
 
