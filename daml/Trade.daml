@@ -19,7 +19,6 @@ type TradeCid = ContractId NewTrade
 template NewTrade
   with
     facilitator : Party
-    authority : Party
     observers : [Party]
     trade: TradeData
   where
@@ -27,26 +26,10 @@ template NewTrade
 
     signatory trade.buyer, facilitator
 
-    observer observers, authority
+    observer observers
 
     controller facilitator can
-      MakePayment : ContractId PaidTrade
-        do
-          create PaidTrade with ..
-
-template PaidTrade
-  with
-    facilitator : Party
-    authority : Party
-    observers : [Party]
-    trade: TradeData
-  where
-    signatory trade.buyer, facilitator
-
-    controller trade.seller can
-      ConfirmPayment : ()
-        do return ()
-
+      MakePayment : () do return ()
 
 template TradeProposal
   with
@@ -67,13 +50,12 @@ happyPath = scenario do
 
   let
     uuid = "abc123"; currency = "AUD"; amount = 1000; volume = 50
-    observers = [authority]
+    observers = [seller]
     trade = TradeData with ..
     newTrade = NewTrade with ..
 
   createProposal <- submit facilitator do create TradeProposal with newTrade
   acceptProposal <- submit buyer do exercise createProposal AcceptTradeIssuance
   facilitatorPaid <- submit facilitator do exercise acceptProposal MakePayment
-  sellerConfirms <- submit seller do exercise facilitatorPaid ConfirmPayment
 
   return()
