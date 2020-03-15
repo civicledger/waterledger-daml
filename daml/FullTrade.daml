@@ -1,0 +1,91 @@
+-- Copyright (c) 2020 The DAML Authors. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+daml 1.2
+module FullTrade where
+
+data TradeData = TradeData
+  with
+    buyer : Party
+    seller : Party
+    uuid : Text
+    currency : Text
+    amount : Int
+    volume : Int
+  deriving (Eq, Show)
+
+type TradeCid = ContractId NewTrade
+
+template ApprovedTrade
+  with
+    facilitator : Party,
+    authority: Party,
+    observers : [Party],
+    trade: TradeData
+  where
+    signatory trade.buyer, facilitator
+
+    observer observers
+
+    controller facilitator can
+      PaymentMade: TradeCid 
+        do create PaidTrade with ..
+
+template PaidTrade
+  with
+    facilitator : Party,
+    authority: Party,
+    observers : [Party],
+    trade: TradeData
+  where
+    signatory trade.buyer, facilitator
+    observer observers
+
+template NewTrade
+  with
+    facilitator : Party,
+    authority: Party,
+    observers : [Party],
+    trade: TradeData
+  where
+    ensure (trade.amount > 0 && trade.volume > 0)
+
+    signatory trade.buyer, facilitator
+
+    observer observers
+
+    controller authority can
+      ApproveTrade: TradeCid
+        do
+          create ApprovedTrade with ..
+
+      RejectTrade : () do return ()
+
+template TradeProposal
+  with
+    newTrade: NewTrade
+  where
+    signatory newTrade.facilitator
+
+    controller newTrade.trade.buyer can
+      AcceptTradeIssuance: TradeCid
+        do create newTrade
+
+happyPath = scenario do
+
+  authority <- getParty "SunWater"
+  facilitator <- getParty "WaterLedger"
+  seller <- getParty "Alice"
+  buyer <- getParty "Bob"
+
+  let
+    uuid = "abc123"; currency = "AUD"; amount = 1000; volume = 50
+    observers = [seller]
+    trade = TradeData with ..
+    newTrade = NewTrade with ..
+
+  createProposal <- submit facilitator do create TradeProposal with newTrade
+  acceptProposal <- submit buyer do exercise createProposal AcceptTradeIssuance
+  facilitatorPaid <- submit facilitator do exercise acceptProposal MakePayment
+
+  return()
